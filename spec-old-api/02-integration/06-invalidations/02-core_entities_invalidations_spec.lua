@@ -215,7 +215,7 @@ describe("core entities are invalidated with db: #" .. strategy, function()
   -- ssl_certificates
   -------------------
 
-  describe("#o ssl_certificates / SNIs", function()
+  describe("ssl_certificates / snis", function()
 
     local function get_cert(port, sni)
       local pl_utils = require "pl.utils"
@@ -344,7 +344,7 @@ describe("core entities are invalidated with db: #" .. strategy, function()
     end)
 
     pending("on SNI update", function()
-      -- Pending: currently, SNIs cannot be updated:
+      -- Pending: currently, snis cannot be updated:
       --   - A PATCH updating the name property would not work, since
       --     the URI path expects the current name, and so does the
       --     query fetchign the row to be updated

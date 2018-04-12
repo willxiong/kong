@@ -18,8 +18,10 @@ local setmetatable = setmetatable
 -- to schemas and entities since schemas will also be used
 -- independently from the DB module (Admin API for GUI)
 local CORE_ENTITIES = {
-  "services",
   "routes",
+  "services",
+  "certificates",
+  "snis",
 }
 
 
@@ -38,6 +40,10 @@ function DB.new(kong_config, strategy)
     error("strategy must be a string", 2)
   end
 
+  -- load errors
+
+  local errors = Errors.new(strategy)
+
   local schemas = {}
 
   do
@@ -49,19 +55,15 @@ function DB.new(kong_config, strategy)
       local entity_schema = require("kong.db.schema.entities." .. entity_name)
 
       -- validate core entities schema via metaschema
-      local ok, err = MetaSchema:validate(entity_schema)
+      local ok, err_t = MetaSchema:validate(entity_schema)
       if not ok then
         return nil, fmt("schema of entity '%s' is invalid: %s", entity_name,
-                        err)
+                        tostring(errors:schema_violation(err_t)))
       end
 
       schemas[entity_name] = Entity.new(entity_schema)
     end
   end
-
-  -- load errors
-
-  local errors = Errors.new(strategy)
 
   -- load strategy
 
