@@ -24,6 +24,7 @@ Consult the Table of Contents below, and jump to the desired section.
     - [Static linting](#static-linting)
     - [Writing tests](#writing-tests)
     - [Writing performant code](#writing-performant-code)
+  - [Contributor T-shirt](#contributor-t-shirt)
 - [Code style](#code-style)
 
 
@@ -33,15 +34,15 @@ Consult the Table of Contents below, and jump to the desired section.
 
 If you are a Kong Enterprise customer, contact the Enterprise Support channels
 by opening an Enterprise support ticket on
-[https://support.mashape.com](https://support.mashape.com/).
+[https://support.konghq.com](https://support.konghq.com/).
 
 If you are experiencing a P1 issue, please call the [24/7 Enterprise Support
-phone line](https://support.mashape.com/hc/en-us/articles/115004921808-Telephone-Support)
+phone line](https://support.konghq.com/hc/en-us/articles/115004921808-Telephone-Support)
 for immediate assistance, as published in the Customer Success Reference Guide.
 
 If you are interested in becoming a Kong Enterprise customer, please visit
-https://www.mashape.com/enterprise/ or contact us at
-[sales@mashape.com](mailto:sales@mashape.com).
+https://konghq.com/kong-enterprise-edition/ or contact us at
+[sales@konghq.com](mailto:sales@konghq.com).
 
 [Back to TOC](#table-of-contents)
 
@@ -51,11 +52,11 @@ https://www.mashape.com/enterprise/ or contact us at
 There are several channels where you can get answers from the community
 or the maintainers of this project:
 
-- The mailing list, hosted on the [konglayer Google
-  Group](https://groups.google.com/forum/#!forum/konglayer) for asynchronous
-  and lengthy chatter
+- Our public forum, [Kong Nation](https://discuss.konghq.com/), for
+  asynchronous and lengthy chatter and staying up-to-date with the latest
+  announcements or usage tips
 - Gitter, for faster, but more ephemeral conversations. The room is
-  hosted at https://gitter.im/Mashape/kong
+  hosted at https://gitter.im/Kong/kong
 - The IRC channel, registered on freenode as [#kong
   ](https://webchat.freenode.net/?channels=kong)
 
@@ -149,14 +150,8 @@ how to do so is the [Distribution
 Section](https://getkong.org/docs/latest/plugin-development/distribution/#distribute-your-plugin)
 of the Plugin Development Guide.
 
-To give visibility to your plugin, we advise that you post an announcement
-thread on the [mailing
-list](https://groups.google.com/forum/#!forum/konglayer). A good title for such
-an announcement would be something like:
-
-```
-[ANN] Community Plugin - [plugin name] [plugin version]
-```
+To give visibility to your plugin, we advise that you create a post in the
+Announcements category of [Kong Nation](https://discuss.konghq.com/)!
 
 In the foreseeable future, we will also include a "Community Plugins" section
 to the online [Plugins Gallery](https://getkong.org/plugins/), and we will
@@ -201,9 +196,11 @@ you are probably the one in need of it. You must be prepared to apply changes
 to it if necessary.
 
 If your Pull Request was accepted, congratulations! You are now an official
-contributor of Kong. Your change will be included in the subsequent release
-Changelog, and we will not forget to include your name if you are an external
-contributor. :wink:
+contributor of Kong. Get in touch with us to receive your very own
+[Contributor T-shirt](#contributor-t-shirt)!
+
+Your change will be included in the subsequent release Changelog, and we will
+not forget to include your name if you are an external contributor. :wink:
 
 [Back to TOC](#table-of-contents)
 
@@ -512,6 +509,21 @@ And finally, most importantly: use your best judgement to design an
 efficient algorithm. Doing so will always be more performant than a
 poorly-designed algorithm, even following all the performance tricks of the
 language you are using. :smile:
+
+[Back to TOC](#table-of-contents)
+
+
+### Contributor T-shirt
+
+If your Pull Request to [Kong/kong](https://github.com/Kong/kong) was accepted,
+congratulations, you are eligible to receive the very special Contributor
+T-shirt! Go ahead and fill-out the [Contributors Submissions
+form](https://goo.gl/forms/5w6mxLaE4tz2YM0L2).
+
+Proudly wear your T-shirt and show it to us by tagging
+[@thekonginc](https://twitter.com/thekonginc) on Twitter!
+
+![Kong Contributor T-shirt](https://konghq.com/wp-content/uploads/2018/04/100-contributor-t-shirt-1024x768.jpg)
 
 [Back to TOC](#table-of-contents)
 

@@ -8,7 +8,11 @@ describe("Plugins", function()
   local plugins
 
   setup(function()
-    local conf = assert(conf_loader())
+    local conf = assert(conf_loader(nil, {
+      -- ensure we test the galileo priority even if galileo isn't enabled by
+      -- default anymore
+      custom_plugins = "galileo",
+    }))
 
     plugins = {}
 
@@ -66,12 +70,12 @@ describe("Plugins", function()
       "datadog",
       "file-log",
       "udp-log",
-      "request-termination",
+      "tcp-log",
       "loggly",
       "runscope",
       "syslog",
       "galileo",
-      "tcp-log",
+      "request-termination",
       "correlation-id",
     }
 

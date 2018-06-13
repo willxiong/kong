@@ -3,11 +3,12 @@ local BasePlugin = require "kong.plugins.base_plugin"
 local responses = require "kong.tools.responses"
 local constants = require "kong.constants"
 local jwt_decoder = require "kong.plugins.jwt.jwt_parser"
-local string_format = string.format
-local ngx_re_gmatch = ngx.re.gmatch
 
+local ipairs         = ipairs
+local string_format  = string.format
+local ngx_re_gmatch  = ngx.re.gmatch
 local ngx_set_header = ngx.req.set_header
-local get_method = ngx.req.get_method
+local get_method     = ngx.req.get_method
 
 local JwtHandler = BasePlugin:extend()
 
@@ -15,7 +16,8 @@ JwtHandler.PRIORITY = 1005
 JwtHandler.VERSION = "0.1.0"
 
 --- Retrieve a JWT in a request.
--- Checks for the JWT in URI parameters, then in the `Authorization` header.
+-- Checks for the JWT in URI parameters, then in cookies, and finally
+-- in the `Authorization` header.
 -- @param request ngx request object
 -- @param conf Plugin configuration
 -- @return token JWT token contained in request (can be a table) or nil
@@ -26,6 +28,14 @@ local function retrieve_token(request, conf)
   for _, v in ipairs(conf.uri_param_names) do
     if uri_parameters[v] then
       return uri_parameters[v]
+    end
+  end
+
+  local ngx_var = ngx.var
+  for _, v in ipairs(conf.cookie_names) do
+    local jwt_cookie = ngx_var["cookie_" .. v]
+    if jwt_cookie and jwt_cookie ~= "" then
+      return jwt_cookie
     end
   end
 
@@ -70,13 +80,14 @@ local function load_consumer(consumer_id, anonymous)
   return result
 end
 
-local function set_consumer(consumer, jwt_secret)
+local function set_consumer(consumer, jwt_secret, token)
   ngx_set_header(constants.HEADERS.CONSUMER_ID, consumer.id)
   ngx_set_header(constants.HEADERS.CONSUMER_CUSTOM_ID, consumer.custom_id)
   ngx_set_header(constants.HEADERS.CONSUMER_USERNAME, consumer.username)
   ngx.ctx.authenticated_consumer = consumer
   if jwt_secret then
     ngx.ctx.authenticated_credential = jwt_secret
+    ngx.ctx.authenticated_jwt_token = token
     ngx_set_header(constants.HEADERS.ANONYMOUS, nil) -- in case of auth plugins concatenation
   else
     ngx_set_header(constants.HEADERS.ANONYMOUS, true)
@@ -108,8 +119,9 @@ local function do_authentication(conf)
   end
 
   local claims = jwt.claims
+  local header = jwt.header
 
-  local jwt_secret_key = claims[conf.key_claim_name]
+  local jwt_secret_key = claims[conf.key_claim_name] or header[conf.key_claim_name]
   if not jwt_secret_key then
     return false, {status = 401, message = "No mandatory '" .. conf.key_claim_name .. "' in claims"}
   end
@@ -167,7 +179,7 @@ local function do_authentication(conf)
     return false, {status = 403, message = string_format("Could not find consumer for '%s=%s'", conf.key_claim_name, jwt_secret_key)}
   end
 
-  set_consumer(consumer, jwt_secret)
+  set_consumer(consumer, jwt_secret, token)
 
   return true
 end
@@ -177,11 +189,7 @@ function JwtHandler:access(conf)
   JwtHandler.super.access(self)
 
   -- check if preflight request and whether it should be authenticated
-  if conf.run_on_preflight == false and get_method() == "OPTIONS" then
-    -- FIXME: the above `== false` test is because existing entries in the db will
-    -- have `nil` and hence will by default start passing the preflight request
-    -- This should be fixed by a migration to update the actual entries
-    -- in the datastore
+  if not conf.run_on_preflight and get_method() == "OPTIONS" then
     return
   end
 
@@ -202,7 +210,7 @@ function JwtHandler:access(conf)
       if err then
         return responses.send_HTTP_INTERNAL_SERVER_ERROR(err)
       end
-      set_consumer(consumer, nil)
+      set_consumer(consumer, nil, nil)
     else
       return responses.send(err.status, err.message)
     end

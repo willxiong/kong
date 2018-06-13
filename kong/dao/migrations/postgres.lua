@@ -375,6 +375,8 @@ return {
     name = "2017-03-27-132300_anonymous",
     -- this should have been in 0.10, but instead goes into 0.10.1 as a bugfix
     up = function(_, _, dao)
+      local cjson = require "cjson"
+
       for _, name in ipairs({
         "basic-auth",
         "hmac-auth",
@@ -383,15 +385,24 @@ return {
         "ldap-auth",
         "oauth2",
       }) do
-        local rows, err = dao.plugins:find_all( { name = name } )
+        local q = string.format("SELECT id, config FROM plugins WHERE name = '%s'",
+                                name)
+
+        local rows, err = dao.db:query(q)
         if err then
           return err
         end
 
         for _, row in ipairs(rows) do
-          if not row.config.anonymous then
-            row.config.anonymous = ""
-            local _, err = dao.plugins:update(row, { id = row.id })
+          local config = cjson.decode(row.config)
+
+          if not config.anonymous then
+            config.anonymous = ""
+
+            local q = string.format("UPDATE plugins SET config = '%s' WHERE id = '%s'",
+                                    cjson.encode(config), row.id)
+
+            local _, err = dao.db:query(q)
             if err then
               return err
             end
@@ -525,5 +536,160 @@ return {
     down = [[
       DROP INDEX ttls_primary_uuid_value_idx;
     ]]
+  },
+  {
+    name = "2017-07-28-225000_balancer_orderlist_remove",
+    up = [[
+      ALTER TABLE upstreams DROP COLUMN IF EXISTS orderlist;
+    ]],
+    down = function(_, _, dao) end  -- not implemented
+  },
+  {
+    name = "2017-10-02-173400_apis_created_at_ms_precision",
+    up = [[
+      ALTER TABLE apis ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP(3);
+    ]],
+    down = [[
+      ALTER TABLE apis ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP(0);
+    ]]
+  },
+  {
+    name = "2017-11-07-192000_upstream_healthchecks",
+    up = [[
+      DO $$
+      BEGIN
+          ALTER TABLE upstreams ADD COLUMN healthchecks json;
+      EXCEPTION WHEN duplicate_column THEN
+          -- Do nothing, accept existing state
+      END$$;
+
+    ]],
+    down = [[
+      ALTER TABLE upstreams DROP COLUMN IF EXISTS healthchecks;
+    ]]
+  },
+  {
+    name = "2017-10-27-134100_consistent_hashing_1",
+    up = [[
+      ALTER TABLE upstreams ADD hash_on text;
+      ALTER TABLE upstreams ADD hash_fallback text;
+      ALTER TABLE upstreams ADD hash_on_header text;
+      ALTER TABLE upstreams ADD hash_fallback_header text;
+    ]],
+    down = [[
+      ALTER TABLE upstreams DROP COLUMN IF EXISTS hash_on;
+      ALTER TABLE upstreams DROP COLUMN IF EXISTS hash_fallback;
+      ALTER TABLE upstreams DROP COLUMN IF EXISTS hash_on_header;
+      ALTER TABLE upstreams DROP COLUMN IF EXISTS hash_fallback_header;
+    ]]
+  },
+  {
+    name = "2017-11-07-192100_upstream_healthchecks_2",
+    up = function(_, _, dao)
+      local rows, err = dao.db:query([[
+        SELECT * FROM upstreams;
+      ]])
+      if err then
+        return err
+      end
+
+      local upstreams = require("kong.dao.schemas.upstreams")
+      local default = upstreams.fields.healthchecks.default
+
+      for _, row in ipairs(rows) do
+        if not row.healthchecks then
+          local _, err = dao.upstreams:update({
+            healthchecks = default,
+          }, { id = row.id })
+          if err then
+            return err
+          end
+        end
+      end
+    end,
+    down = function(_, _, dao) end
+  },
+  {
+    name = "2017-10-27-134100_consistent_hashing_2",
+    up = function(_, _, dao)
+      local rows, err = dao.db:query([[
+        SELECT * FROM upstreams;
+      ]])
+      if err then
+        return err
+      end
+
+      for _, row in ipairs(rows) do
+        if not row.hash_on or not row.hash_fallback then
+          row.hash_on = "none"
+          row.hash_fallback = "none"
+          row.created_at = nil
+          local _, err = dao.upstreams:update(row, { id = row.id })
+          if err then
+            return err
+          end
+        end
+      end
+    end,
+    down = function(_, _, dao) end  -- n.a. since the columns will be dropped
+  },
+  {
+    name = "2017-09-14-121200_routes_and_services",
+    up = [[
+      CREATE TABLE IF NOT EXISTS "services" (
+        "id"               UUID                       PRIMARY KEY,
+        "created_at"       TIMESTAMP WITH TIME ZONE,
+        "updated_at"       TIMESTAMP WITH TIME ZONE,
+        "name"             TEXT                       UNIQUE,
+        "retries"          BIGINT,
+        "protocol"         TEXT,
+        "host"             TEXT,
+        "port"             BIGINT,
+        "path"             TEXT,
+        "connect_timeout"  BIGINT,
+        "write_timeout"    BIGINT,
+        "read_timeout"     BIGINT
+      );
+
+      CREATE TABLE IF NOT EXISTS "routes" (
+        "id"             UUID                       PRIMARY KEY,
+        "created_at"     TIMESTAMP WITH TIME ZONE,
+        "updated_at"     TIMESTAMP WITH TIME ZONE,
+        "protocols"      TEXT[],
+        "methods"        TEXT[],
+        "hosts"          TEXT[],
+        "paths"          TEXT[],
+        "regex_priority" BIGINT,
+        "strip_path"     BOOLEAN,
+        "preserve_host"  BOOLEAN,
+        "service_id"     UUID                       REFERENCES "services" ("id")
+      );
+      DO $$
+      BEGIN
+        IF (SELECT to_regclass('routes_fkey_service') IS NULL) THEN
+          CREATE INDEX "routes_fkey_service"
+                    ON "routes" ("service_id");
+        END IF;
+      END$$;
+    ]],
+    down = nil
+  },
+  {
+    name = "2017-10-25-180700_plugins_routes_and_services",
+    up = [[
+      ALTER TABLE plugins ADD route_id uuid REFERENCES routes(id) ON DELETE CASCADE;
+      ALTER TABLE plugins ADD service_id uuid REFERENCES services(id) ON DELETE CASCADE;
+
+      DO $$
+      BEGIN
+        IF (SELECT to_regclass('plugins_route_id_idx')) IS NULL THEN
+          CREATE INDEX plugins_route_id_idx ON plugins(route_id);
+        END IF;
+        IF (SELECT to_regclass('plugins_service_id_idx')) IS NULL THEN
+          CREATE INDEX plugins_service_id_idx ON plugins(service_id);
+        END IF;
+      END$$;
+    ]],
+    down = nil
   },
 }

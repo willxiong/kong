@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-export BUSTED_ARGS="-o gtest -v --exclude-tags=flaky"
+export BUSTED_ARGS="-o gtest -v --exclude-tags=flaky,ipv6"
 export TEST_CMD="bin/busted $BUSTED_ARGS"
 
 createuser --createdb kong
@@ -15,4 +15,10 @@ elif [ "$TEST_SUITE" == "integration" ]; then
     make test-integration
 elif [ "$TEST_SUITE" == "plugins" ]; then
     make test-plugins
+elif [ "$TEST_SUITE" == "old-unit" ]; then
+    make old-test
+elif [ "$TEST_SUITE" == "old-integration" ]; then
+    make old-test-integration
+elif [ "$TEST_SUITE" == "old-plugins" ]; then
+    make old-test-plugins
 fi

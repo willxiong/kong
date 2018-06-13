@@ -1,3 +1,6 @@
+local log = require "kong.cmd.utils.log"
+
+
 return {
   {
     name = "2015-01-12-175310_skeleton",
@@ -26,20 +29,33 @@ return {
         return "invalid replication_strategy class"
       end
 
-      -- Format final keyspace creation query
-      local keyspace_str = string.format([[
-        CREATE KEYSPACE IF NOT EXISTS "%s"
-          WITH REPLICATION = {'class': '%s'%s};
-      ]], keyspace_name, strategy, strategy_properties)
-
-      local res, err = db:query(keyspace_str, nil, nil, nil, true)
-      if not res then
-        return err
-      end
-
+      -- Test keyspace existence by trying to switch to it. The keyspace
+      -- could have been created by a DBA or could not exist.
       local ok, err = db:coordinator_change_keyspace(keyspace_name)
       if not ok then
-        return err
+        -- The keyspace either does not exist or we do not have access
+        -- to it. Let's try to create it.
+        log("could not switch to %s keyspace (%s), attempting to create it",
+            keyspace_name, err)
+
+        local keyspace_str = string.format([[
+          CREATE KEYSPACE IF NOT EXISTS "%s"
+            WITH REPLICATION = {'class': '%s'%s};
+        ]], keyspace_name, strategy, strategy_properties)
+
+        local res, err = db:query(keyspace_str, nil, nil, nil, true)
+        if not res then
+          -- keyspace creation failed (no sufficients permissions or
+          -- any other reason)
+          return err
+        end
+
+        log("successfully created %s keyspace", keyspace_name)
+
+        local ok, err = db:coordinator_change_keyspace(keyspace_name)
+        if not ok then
+          return err
+        end
       end
 
       local res, err = db:query [[
@@ -319,7 +335,7 @@ return {
     up = function(db, kong_config)
       local keyspace_name = kong_config.cassandra_keyspace
 
-      if db.release_version < 3 then
+      if db.major_version_n < 3 then
         local rows, err = db:query([[
           SELECT *
           FROM system.schema_columns
@@ -471,7 +487,147 @@ return {
   {
     name = "2017-05-19-173100_remove_nodes_table",
     up = [[
+      DROP INDEX IF EXISTS nodes_cluster_listening_address_idx;
       DROP TABLE nodes;
     ]],
   },
+  {
+    name = "2017-07-28-225000_balancer_orderlist_remove",
+    up = [[
+      ALTER TABLE upstreams DROP orderlist;
+    ]],
+    down = function(_, _, dao) end  -- not implemented
+  },
+  {
+    name = "2017-11-07-192000_upstream_healthchecks",
+    up = [[
+      ALTER TABLE upstreams ADD healthchecks text;
+    ]],
+    down = [[
+      ALTER TABLE upstreams DROP healthchecks;
+    ]]
+  },
+  {
+    name = "2017-10-27-134100_consistent_hashing_1",
+    up = [[
+      ALTER TABLE upstreams ADD hash_on text;
+      ALTER TABLE upstreams ADD hash_fallback text;
+      ALTER TABLE upstreams ADD hash_on_header text;
+      ALTER TABLE upstreams ADD hash_fallback_header text;
+    ]],
+    down = [[
+      ALTER TABLE upstreams DROP hash_on;
+      ALTER TABLE upstreams DROP hash_fallback;
+      ALTER TABLE upstreams DROP hash_on_header;
+      ALTER TABLE upstreams DROP hash_fallback_header;
+    ]]
+  },
+  {
+    name = "2017-11-07-192100_upstream_healthchecks_2",
+    up = function(_, _, dao)
+      local rows, err = dao.upstreams:find_all()
+      if err then
+        return err
+      end
+
+      local upstreams = require("kong.dao.schemas.upstreams")
+      local default = upstreams.fields.healthchecks.default
+
+      for _, row in ipairs(rows) do
+        if not row.healthchecks then
+          local _, err = dao.upstreams:update({
+            healthchecks = default,
+          }, { id = row.id })
+          if err then
+            return err
+          end
+        end
+      end
+    end,
+    down = function(_, _, dao) end
+  },
+  {
+    name = "2017-10-27-134100_consistent_hashing_2",
+    up = function(_, _, dao)
+      local rows, err = dao.upstreams:find_all()
+      if err then
+        return err
+      end
+
+      for _, row in ipairs(rows) do
+        if not row.hash_on or not row.hash_fallback then
+          row.hash_on = "none"
+          row.hash_fallback = "none"
+          local _, err = dao.upstreams:update(row, { id = row.id })
+          if err then
+            return err
+          end
+        end
+      end
+    end,
+    down = function(_, _, dao) end  -- n.a. since the columns will be dropped
+  },
+  {
+    name = "2017-09-14-140200_routes_and_services",
+    up = [[
+      CREATE TABLE IF NOT EXISTS routes (
+          partition       text,
+          id              uuid,
+          created_at      timestamp,
+          updated_at      timestamp,
+          protocols       set<text>,
+          methods         set<text>,
+          hosts           list<text>,
+          paths           list<text>,
+          regex_priority  int,
+          strip_path      boolean,
+          preserve_host   boolean,
+
+          service_id      uuid,
+
+          PRIMARY KEY     (partition, id)
+      );
+
+      CREATE INDEX IF NOT EXISTS routes_service_id_idx ON routes(service_id);
+
+      CREATE TABLE IF NOT EXISTS services (
+          partition       text,
+          id              uuid,
+          created_at      timestamp,
+          updated_at      timestamp,
+          name            text,
+          protocol        text,
+          host            text,
+          port            int,
+          path            text,
+          retries         int,
+          connect_timeout int,
+          write_timeout   int,
+          read_timeout    int,
+
+          PRIMARY KEY (partition, id)
+      );
+
+      CREATE INDEX IF NOT EXISTS services_name_idx ON services(name);
+    ]],
+    down = nil
+  },
+  {
+    name = "2017-10-25-180700_plugins_routes_and_services",
+    up = [[
+      ALTER TABLE plugins ADD route_id uuid;
+      ALTER TABLE plugins ADD service_id uuid;
+
+      CREATE INDEX IF NOT EXISTS ON plugins(route_id);
+      CREATE INDEX IF NOT EXISTS ON plugins(service_id);
+    ]],
+    down = nil
+  },
+  {
+    name = "2018-02-23-142400_targets_add_index",
+    up = [[
+      CREATE INDEX IF NOT EXISTS ON targets(target);
+    ]],
+    down = nil
+  }
 }

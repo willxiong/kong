@@ -4,14 +4,13 @@
 
 Kong is a cloud-native, fast, scalable, and distributed Microservice
 Abstraction Layer *(also known as an API Gateway, API Middleware or in some
-cases Service Mesh)*.
+cases Service Mesh)*. Made available as an open-source project in 2015, its
+core values are high performance and extensibility.
 
-Backed by the battle-tested **NGINX** with a focus on high performance, Kong
-was made available as an open-source platform in 2015. Under active
-development, Kong is used in production at thousands of organizations from
-startups, Global 5000 and Government organizations.
+Actively maintained, Kong is widely used in production at companies ranging
+from startups to Global 5000 as well as government organizations.
 
-[Installation](https://getkong.org/install) |
+[Installation](https://konghq.com/install) |
 [Documentation](https://getkong.org/docs) |
 [Forum](https://discuss.konghq.com) |
 [Blog](https://konghq.com/blog) |
@@ -21,7 +20,6 @@ IRC (freenode): [#kong](http://webchat.freenode.net/?channels=kong)
 
 - [**Why Kong?**](#why-kong)
 - [**Features**](#features)
-- [**Benchmarks**](#benchmarks)
 - [**Distributions**](#distributions)
 - [**Development**](#development)
 - [**Enterprise Support & Demo**](#enterprise-support--demo)
@@ -32,8 +30,8 @@ IRC (freenode): [#kong](http://webchat.freenode.net/?channels=kong)
 If you are building for web, mobile or IoT (Internet of Things) you will likely
 end up needing common functionality to run your actual software. Kong can
 help by acting as a gateway (or a sidecar) for microservices requests while
-providing load balancing, logging, authentication, rate-limiting and more
-through plugins.
+providing load balancing, logging, authentication, rate-limiting,
+transformations, and more through plugins.
 
 [![][kong-benefits]][kong-url]
 
@@ -41,11 +39,15 @@ through plugins.
 
 - **Cloud-Native**: Platform agnostic, Kong can run from bare metal to
   Kubernetes.
-- **Dynamic Load Balancing**: Load balance traffic across multiple backend
+- **Dynamic Load Balancing**: Load balance traffic across multiple upstream
   services.
+- **Hash-based Load Balancing**: Load balance with consistent hashing/sticky
+  sessions.
+- **Circuit-Breaker**: Intelligent tracking of unhealthy upstream services.
+- **Health Checks:** Active and passive monitoring of your upstream services.
 - **Service Discovery**: Resolve SRV records in third-party DNS resolvers like
   Consul.
-- **Serverless**: Invoke and secure AWS Lambda or OpenWhisk fuctions directly
+- **Serverless**: Invoke and secure AWS Lambda or OpenWhisk functions directly
   from Kong.
 - **WebSockets**: Communicate to your upstream services via WebSockets.
 - **OAuth2.0**: Easily add OAuth2.0 authentication to your APIs.
@@ -56,6 +58,7 @@ through plugins.
 - **SSL**: Setup a Specific SSL Certificate for an underlying service or API.
 - **Monitoring**: Live monitoring provides key load and performance server
   metrics.
+- **Forward Proxy**: Make Kong connect to intermediary transparent HTTP proxies.
 - **Authentications**: HMAC, JWT, Basic, and more.
 - **Rate-limiting**: Block and throttle requests based on many variables.
 - **Transformations**: Add, remove, or manipulate HTTP requests and responses.
@@ -77,11 +80,6 @@ through plugins.
 
 For more info about plugins, you can check out the [Plugins
 Hub](https://konghq.com/plugins/).
-
-## Benchmarks
-
-We've load tested Kong and Cassandra on AWS; you can see our [benchmark report
-here](https://getkong.org/about/benchmark/).
 
 ## Distributions
 
@@ -121,7 +119,7 @@ Reference](https://getkong.org/docs/latest/lua-reference/).
 #### Vagrant
 
 You can use a Vagrant box running Kong and Postgres that you can find at
-[Mashape/kong-vagrant](https://github.com/Kong/kong-vagrant).
+[Kong/kong-vagrant](https://github.com/Kong/kong-vagrant).
 
 #### Source Install
 
@@ -232,7 +230,7 @@ Enterprise](https://konghq.com/kong-enterprise-edition/).
 ## License
 
 ```
-Copyright 2016-2017 Kong Inc.
+Copyright 2016-2018 Kong Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -248,13 +246,11 @@ limitations under the License.
 ```
 
 [kong-url]: https://konghq.com/
-[kong-logo]: https://cl.ly/030V1u02090Q/unnamed.png
-[kong-benefits]: https://cl.ly/002i2Z432A1s/Image%202017-10-16%20at%2012.30.08%20AM.png
-[google-groups-url]: https://groups.google.com/forum/#!forum/konglayer
+[kong-logo]: https://konghq.com/wp-content/uploads/2018/05/kong-logo-github-readme.png
+[kong-benefits]: https://konghq.com/wp-content/uploads/2018/05/kong-benefits-github-readme.png
 [badge-travis-url]: https://travis-ci.org/Kong/kong/branches
 [badge-travis-image]: https://travis-ci.org/Kong/kong.svg?branch=master
 
 [busted]: https://github.com/Olivine-Labs/busted
 [luacheck]: https://github.com/mpeterv/luacheck
-[Luarocks]: https://luarocks.org
 

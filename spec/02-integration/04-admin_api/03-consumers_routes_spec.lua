@@ -10,33 +10,43 @@ local function it_content_types(title, fn)
   it(title .. " with application/json", test_json)
 end
 
+for _, strategy in helpers.each_strategy() do
+
 describe("Admin API", function()
+  local dao
   local client
+
   setup(function()
-    helpers.run_migrations()
-    assert(helpers.start_kong())
-    client = helpers.admin_client()
+    _, _, dao = helpers.get_db_utils(strategy)
+    assert(helpers.start_kong({
+      database = strategy
+    }))
   end)
+
   teardown(function()
-    if client then client:close() end
     helpers.stop_kong()
   end)
 
   local consumer, consumer2, consumer3
   before_each(function()
-    helpers.dao:truncate_tables()
-    consumer = assert(helpers.dao.consumers:insert {
+    dao:truncate_tables()
+    consumer = assert(dao.consumers:insert {
       username = "bob",
       custom_id = "1234"
     })
-    consumer2 = assert(helpers.dao.consumers:insert {
+    consumer2 = assert(dao.consumers:insert {
       username = "bob pop",  -- containing space for urlencoded test
       custom_id = "abcd"
     })
-    consumer3 = assert(helpers.dao.consumers:insert {
+    consumer3 = assert(dao.consumers:insert {
       username = "83825bb5-38c7-4160-8c23-54dd2b007f31",  -- uuid format
       custom_id = "1a2b"
     })
+    client = helpers.admin_client()
+  end)
+
+  after_each(function()
+    if client then client:close() end
   end)
 
   describe("/consumers", function()
@@ -109,6 +119,71 @@ describe("Admin API", function()
             assert.same({ custom_id = "already exists with value '1234'" }, json)
           end
         end)
+        it("returns 415 on invalid content-type", function()
+          local res = assert(client:request {
+            method = "POST",
+            path = "/consumers",
+            body = '{"hello": "world"}',
+            headers = {["Content-Type"] = "invalid"}
+          })
+          assert.res_status(415, res)
+        end)
+        it("returns 415 on missing content-type with body ", function()
+          local res = assert(client:request {
+            method = "POST",
+            path = "/consumers",
+            body = "invalid"
+          })
+          assert.res_status(415, res)
+        end)
+        it("returns 400 on missing body with application/json", function()
+          local res = assert(client:request {
+            method = "POST",
+            path = "/consumers",
+            headers = {["Content-Type"] = "application/json"}
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({ message = "Cannot parse JSON body" }, json)
+        end)
+        it("returns 400 on missing body with multipart/form-data", function()
+          local res = assert(client:request {
+            method = "POST",
+            path = "/consumers",
+            headers = {["Content-Type"] = "multipart/form-data"}
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({
+            custom_id = "At least a 'custom_id' or a 'username' must be specified",
+            username  = "At least a 'custom_id' or a 'username' must be specified",
+          }, json)
+        end)
+        it("returns 400 on missing body with multipart/x-www-form-urlencoded", function()
+          local res = assert(client:request {
+            method = "POST",
+            path = "/consumers",
+            headers = {["Content-Type"] = "application/x-www-form-urlencoded"}
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({
+            custom_id = "At least a 'custom_id' or a 'username' must be specified",
+            username  = "At least a 'custom_id' or a 'username' must be specified",
+          }, json)
+        end)
+        it("returns 400 on missing body with no content-type header", function()
+          local res = assert(client:request {
+            method = "POST",
+            path = "/consumers",
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({
+            custom_id = "At least a 'custom_id' or a 'username' must be specified",
+            username  = "At least a 'custom_id' or a 'username' must be specified",
+          }, json)
+        end)
       end)
     end)
 
@@ -173,7 +248,7 @@ describe("Admin API", function()
         --
         -- Eventually, our Admin endpoint will follow a more appropriate
         -- behavior for PUT.
-        local res = assert(client:send {
+        local res = assert(helpers.admin_client():send {
           method = "PUT",
           path = "/consumers",
           body = {
@@ -233,26 +308,91 @@ describe("Admin API", function()
             assert.same({ username = "already exists with value 'alice'" }, json)
           end
         end)
+        it("returns 415 on invalid content-type", function()
+          local res = assert(client:request {
+            method = "PUT",
+            path = "/consumers",
+            body = '{"hello": "world"}',
+            headers = {["Content-Type"] = "invalid"}
+          })
+          assert.res_status(415, res)
+        end)
+        it("returns 415 on missing content-type with body ", function()
+          local res = assert(client:request {
+            method = "PUT",
+            path = "/consumers",
+            body = "invalid"
+          })
+          assert.res_status(415, res)
+        end)
+        it("returns 400 on missing body with application/json", function()
+          local res = assert(client:request {
+            method = "PUT",
+            path = "/consumers",
+            headers = {["Content-Type"] = "application/json"}
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({ message = "Cannot parse JSON body" }, json)
+        end)
+        it("returns 400 on missing body with multipart/form-data", function()
+          local res = assert(client:request {
+            method = "PUT",
+            path = "/consumers",
+            headers = {["Content-Type"] = "multipart/form-data"}
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({
+            custom_id = "At least a 'custom_id' or a 'username' must be specified",
+            username  = "At least a 'custom_id' or a 'username' must be specified",
+          }, json)
+        end)
+        it("returns 400 on missing body with multipart/x-www-form-urlencoded", function()
+          local res = assert(client:request {
+            method = "PUT",
+            path = "/consumers",
+            headers = {["Content-Type"] = "application/x-www-form-urlencoded"}
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({
+            custom_id = "At least a 'custom_id' or a 'username' must be specified",
+            username  = "At least a 'custom_id' or a 'username' must be specified",
+          }, json)
+        end)
+        it("returns 400 on missing body with no content-type header", function()
+          local res = assert(client:request {
+            method = "PUT",
+            path = "/consumers",
+          })
+          local body = assert.res_status(400, res)
+          local json = cjson.decode(body)
+          assert.same({
+            custom_id = "At least a 'custom_id' or a 'username' must be specified",
+            username  = "At least a 'custom_id' or a 'username' must be specified",
+          }, json)
+        end)
       end)
     end)
 
     describe("GET", function()
       before_each(function()
-        helpers.dao:truncate_tables()
+        dao:truncate_tables()
 
         for i = 1, 10 do
-          assert(helpers.dao.consumers:insert {
+          assert(dao.consumers:insert {
             username = "consumer-" .. i,
           })
         end
       end)
       teardown(function()
-        helpers.dao:truncate_tables()
+        dao:truncate_tables()
       end)
 
       it("retrieves the first page", function()
         local res = assert(client:send {
-          methd = "GET",
+          method = "GET",
           path = "/consumers"
         })
         res = assert.res_status(200, res)
@@ -378,7 +518,7 @@ describe("Admin API", function()
             assert.equal("alice", json.username)
             assert.equal(consumer.id, json.id)
 
-            local in_db = assert(helpers.dao.consumers:find {id = consumer.id})
+            local in_db = assert(dao.consumers:find {id = consumer.id})
             assert.same(json, in_db)
           end
         end)
@@ -397,7 +537,7 @@ describe("Admin API", function()
             assert.equal("alice", json.username)
             assert.equal(consumer.id, json.id)
 
-            local in_db = assert(helpers.dao.consumers:find {id = consumer.id})
+            local in_db = assert(dao.consumers:find {id = consumer.id})
             assert.same(json, in_db)
           end
         end)
@@ -427,6 +567,62 @@ describe("Admin API", function()
               local json = cjson.decode(body)
               assert.same({ message = "empty body" }, json)
             end
+          end)
+          it("returns 415 on invalid content-type", function()
+            local res = assert(client:request {
+              method = "PATCH",
+              path = "/consumers/" .. consumer.id,
+              body = '{"hello": "world"}',
+              headers = {["Content-Type"] = "invalid"}
+            })
+            assert.res_status(415, res)
+          end)
+          it("returns 415 on missing content-type with body ", function()
+            local res = assert(client:request {
+              method = "PATCH",
+              path = "/consumers/" .. consumer.id,
+              body = "invalid"
+            })
+            assert.res_status(415, res)
+          end)
+          it("returns 400 on missing body with application/json", function()
+            local res = assert(client:request {
+              method = "PATCH",
+              path = "/consumers/" .. consumer.id,
+              headers = {["Content-Type"] = "application/json"}
+            })
+            local body = assert.res_status(400, res)
+            local json = cjson.decode(body)
+            assert.same({ message = "Cannot parse JSON body" }, json)
+          end)
+          it("returns 400 on missing body with multipart/form-data", function()
+            local res = assert(client:request {
+              method = "PATCH",
+              path = "/consumers/" .. consumer.id,
+              headers = {["Content-Type"] = "multipart/form-data"}
+            })
+            local body = assert.res_status(400, res)
+            local json = cjson.decode(body)
+            assert.same({ message = "empty body" }, json)
+          end)
+          it("returns 400 on missing body with multipart/x-www-form-urlencoded", function()
+            local res = assert(client:request {
+              method = "PATCH",
+              path = "/consumers/" .. consumer.id,
+              headers = {["Content-Type"] = "application/x-www-form-urlencoded"}
+            })
+            local body = assert.res_status(400, res)
+            local json = cjson.decode(body)
+            assert.same({ message = "empty body" }, json)
+          end)
+          it("returns 400 on missing body with no content-type header", function()
+            local res = assert(client:request {
+              method = "PATCH",
+              path = "/consumers/" .. consumer.id,
+            })
+            local body = assert.res_status(400, res)
+            local json = cjson.decode(body)
+            assert.same({ message = "empty body" }, json)
           end)
         end)
       end)
@@ -463,7 +659,7 @@ describe("Admin API", function()
 
   describe("/consumers/{username_or_id}/plugins", function()
     before_each(function()
-      helpers.dao.plugins:truncate()
+      dao.plugins:truncate()
     end)
     describe("POST", function()
       it_content_types("creates a plugin config using a consumer id", function(content_type)
@@ -614,7 +810,7 @@ describe("Admin API", function()
       end)
       it_content_types("prefers default values when replacing", function(content_type)
         return function()
-          local plugin = assert(helpers.dao.plugins:insert {
+          local plugin = assert(dao.plugins:insert {
             name = "rewriter",
             consumer_id = consumer.id,
             config = { value = "potato", extra = "super" }
@@ -638,7 +834,7 @@ describe("Admin API", function()
           assert.equal(json.config.value, "carrot")
           assert.equal(json.config.extra, "extra") -- changed to the default value
 
-          plugin = assert(helpers.dao.plugins:find {
+          plugin = assert(dao.plugins:find {
             id = plugin.id,
             name = plugin.name
           })
@@ -648,7 +844,7 @@ describe("Admin API", function()
       end)
       it_content_types("overrides a plugin previous config if partial", function(content_type)
         return function()
-          local plugin = assert(helpers.dao.plugins:insert {
+          local plugin = assert(dao.plugins:insert {
             name = "rewriter",
             consumer_id = consumer.id
           })
@@ -672,7 +868,7 @@ describe("Admin API", function()
       end)
       it_content_types("updates the enabled property", function(content_type)
         return function()
-          local plugin = assert(helpers.dao.plugins:insert {
+          local plugin = assert(dao.plugins:insert {
             name = "rewriter",
             consumer_id = consumer.id
           })
@@ -693,7 +889,7 @@ describe("Admin API", function()
           local json = cjson.decode(body)
           assert.False(json.enabled)
 
-          plugin = assert(helpers.dao.plugins:find {
+          plugin = assert(dao.plugins:find {
             id = plugin.id,
             name = plugin.name
           })
@@ -719,7 +915,7 @@ describe("Admin API", function()
 
     describe("GET", function()
       it("retrieves the first page", function()
-        assert(helpers.dao.plugins:insert {
+        assert(dao.plugins:insert {
           name = "rewriter",
           consumer_id = consumer.id
         })
@@ -750,11 +946,11 @@ describe("Admin API", function()
   describe("/consumers/{username_or_id}/plugins/{plugin}", function()
     local plugin, plugin2
     before_each(function()
-      plugin = assert(helpers.dao.plugins:insert {
+      plugin = assert(dao.plugins:insert {
         name = "rewriter",
         consumer_id = consumer.id
       })
-      plugin2 = assert(helpers.dao.plugins:insert {
+      plugin2 = assert(dao.plugins:insert {
         name = "rewriter",
         consumer_id = consumer2.id
       })
@@ -781,7 +977,7 @@ describe("Admin API", function()
       end)
       it("only retrieves if associated to the correct consumer", function()
         -- Create an consumer and try to query our plugin through it
-        local w_consumer = assert(helpers.dao.consumers:insert {
+        local w_consumer = assert(dao.consumers:insert {
           custom_id = "wc",
           username = "wrong-consumer"
         })
@@ -822,7 +1018,7 @@ describe("Admin API", function()
           assert.equal("updated", json.config.value)
           assert.equal(plugin.id, json.id)
 
-          local in_db = assert(helpers.dao.plugins:find {
+          local in_db = assert(dao.plugins:find {
             id = plugin.id,
             name = plugin.name
           })
@@ -832,7 +1028,7 @@ describe("Admin API", function()
       it_content_types("doesn't override a plugin config if partial", function(content_type)
         -- This is delicate since a plugin config is a text field in a DB like Cassandra
         return function()
-          plugin = assert(helpers.dao.plugins:update(
+          plugin = assert(dao.plugins:update(
               { config = { value = "potato" } },
               { id = plugin.id, name = plugin.name }
           ))
@@ -852,7 +1048,7 @@ describe("Admin API", function()
           assert.equal("carrot", json.config.value)
           assert.equal("extra", json.config.extra)
 
-          plugin = assert(helpers.dao.plugins:find {
+          plugin = assert(dao.plugins:find {
             id = plugin.id,
             name = plugin.name
           })
@@ -875,7 +1071,7 @@ describe("Admin API", function()
           local json = cjson.decode(body)
           assert.False(json.enabled)
 
-          plugin = assert(helpers.dao.plugins:find {
+          plugin = assert(dao.plugins:find {
             id = plugin.id,
             name = plugin.name
           })
@@ -906,7 +1102,7 @@ describe("Admin API", function()
             })
             local body = assert.res_status(400, res)
             local json = cjson.decode(body)
-            assert.same({ config = "Plugin \"foo\" not found" }, json)
+            assert.same({ config = "plugin 'foo' not enabled; add it to the 'custom_plugins' configuration property" }, json)
           end
         end)
       end)
@@ -932,3 +1128,5 @@ describe("Admin API", function()
     end)
   end)
 end)
+
+end
